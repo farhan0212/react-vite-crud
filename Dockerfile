@@ -7,7 +7,6 @@ RUN npm run build
 
 FROM node:20-alpine
 WORKDIR /app
-RUN npm install -g serve
+RUN npm install -g vite
 COPY --from=builder /app/dist ./dist
-EXPOSE 2000
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["vite", "preview", "--host", "--port", "3000"]
