@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useEffect, useState, useCallback } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
@@ -7,6 +8,14 @@ type User = {
   email: string;
 };
 
+interface PaginatedResponse {
+  data: User[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [form, setForm] = useState<{ name: string; email: string }>({
@@ -14,15 +23,28 @@ export default function Users() {
     email: "",
   });
   const [editId, setEditId] = useState<number | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const limit = 10;
+  const [total, setTotal] = useState<number>(0);
+  const [totalpages, setTotalPages] = useState<number>(1);
 
-  const apiURL = "api/users";
+  // Remove this line, as totalpages is set from API response
+  // totalPages = Math.ceil(total / limit);
 
-  const fetchUsers = useCallback(() => {
-    fetch(apiURL)
-      .then((res) => res.json())
-      .then(setUsers)
-      .catch(console.error);
-  }, [apiURL]);
+  const apiURL = "http://localhost:8080/users";
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await axios.get<PaginatedResponse>(
+        `${apiURL}?page=${page}&limit=${limit}`
+      );
+      setUsers(res.data.data);
+      setTotal(res.data.total);
+      setTotalPages(res.data.totalPages);
+    } catch (error) {
+      console.error("failed to fetch users", error);
+    }
+  }, [apiURL, page, limit]);
 
   useEffect(() => {
     fetchUsers();
@@ -34,18 +56,22 @@ export default function Users() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const method = editId ? "PUT" : "POST";
-    const url = editId ? `${apiURL}/${editId}` : apiURL;
-
-    await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    setForm({ name: "", email: "" });
-    setEditId(null);
-    fetchUsers();
+    try {
+      if (editId) {
+        await axios.put(`${apiURL}/${editId}`, form, {
+          headers: { "Content-Type": "application/json" },
+        });
+      } else {
+        await axios.post(apiURL, form, {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      setForm({ name: "", email: "" });
+      setEditId(null);
+      fetchUsers();
+    } catch (error) {
+      console.error("failed to submit user", error);
+    }
   };
 
   const handleEdit = (user: User) => {
@@ -55,15 +81,19 @@ export default function Users() {
 
   const handleDelete = async (id: number) => {
     if (confirm("Yakin ingin menghapus user ini?")) {
-      await fetch(`${apiURL}/${id}`, { method: "DELETE" });
-      fetchUsers();
+      try {
+        await axios.delete(`${apiURL}/${id}`);
+        fetchUsers();
+      } catch (error) {
+        console.error("failed to delete user", error);
+      }
     }
   };
 
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="bg-white shadow-lg rounded-lg overflow-hidden">
             <div className="p-6">
               <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
@@ -141,7 +171,7 @@ export default function Users() {
               Daftar User
             </h3>
 
-            {users.length === 0 ? (
+            {!users || users.length === 0 ? (
               <p className="text-gray-500 text-center py-4">
                 Tidak ada user yang tersedia
               </p>
@@ -173,6 +203,45 @@ export default function Users() {
                   </li>
                 ))}
               </ul>
+            )}
+
+            {totalpages > 1 && (
+              <div className="flex justify-center items-center gap-2 py-4">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className={`px-3 py-1 rounded-md ${
+                    page === 1
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                  } transition-all`}>
+                  Prev
+                </button>
+                {Array.from({ length: totalpages }, (_, i) => i + 1).map(
+                  (p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`px-3 py-1 rounded-md ${
+                        page === p
+                          ? "bg-indigo-600 text-white"
+                          : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                      } transition-all`}>
+                      {p}
+                    </button>
+                  )
+                )}
+                <button
+                  onClick={() => setPage((p) => Math.min(totalpages, p + 1))}
+                  disabled={page === totalpages}
+                  className={`px-3 py-1 rounded-md ${
+                    page === totalpages
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                  } transition-all`}>
+                  Next
+                </button>
+              </div>
             )}
           </div>
         </div>
