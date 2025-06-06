@@ -20,7 +20,7 @@ export default function UsersPage() {
   const [editId, setEditId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const apiURL = "http://localhost:8080/users";
+  const apiURL = "/api/users";
 
   const fetchUsers = useCallback(async () => {
     const res = await axios.get<PaginatedResponse>(
